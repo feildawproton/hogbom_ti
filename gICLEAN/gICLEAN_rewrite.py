@@ -109,7 +109,8 @@ __global__ void dblGrid_kernel(float2 *Grd, int nu, int hfac){
   int iv = blockDim.y*blockIdx.y + threadIdx.y;
   int u0 = 0.5*nu;
   if (iu > 0 && iu < u0 && iv < nu){
-    int niu = nu-iu;
+    int niu = nu-iu;   
+    
     int niv = nu-iv;
     Grd[iv*nu+iu].x =      Grd[niv*nu+niu].x;
     Grd[iv*nu+iu].y = hfac*Grd[niv*nu+niu].y;
@@ -444,6 +445,11 @@ def cuda_gridvis(settings,plan):
   d_bm   = gpu.zeros_like(d_grd)
   d_nbm  = gpu.zeros_like(d_grd)
   d_fim  = gpu.zeros((imsize,imsize),np.float32)
+  
+  print("d_cnt", d_cnt.shape)
+  print("d_grd", d_grd.shape)
+  print("d_bm", d_bm.shape)
+  
   ## define kernel parameters
   blocksize2D  = (8,16,1)
   gridsize2D   = (int(np.ceil(1.*nx/blocksize2D[0])),int(np.ceil(1.*nx/blocksize2D[1])))
@@ -472,6 +478,10 @@ def cuda_gridvis(settings,plan):
   d_vmax = gpu.max(cumath.fabs(d_v))
   umax   = np.int32(np.ceil(d_umax.get()/du))
   vmax   = np.int32(np.ceil(d_vmax.get()/du))
+  
+  print("du", du)
+  print("umax", umax)
+  print("vmax", vmax)
 
   ## grid ($$)
   #  This should be improvable via:
