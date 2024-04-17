@@ -766,7 +766,7 @@ if __name__ == '__main__':
     
   example = 'mouse'
   ISIZE = 64
-  CLEAN = False
+  CLEAN = True
   
   # Load settings for each example
   settings = dict([])
@@ -825,6 +825,11 @@ if __name__ == '__main__':
   plt.imshow(dpsf.imag)
   plt.savefig("output/dirty_psf_imag.png")
 
+  np.save("output/dirty_img_real.npy", dirty.real)
+  np.save("output/dirty_img_imag.npy", dirty.imag)
+  np.save("output/dirty_psf_real.npy", dpsf.real)
+  np.save("output/dirty_psf_imag.npy", dpsf.imag)
+  
   ## Clean the PSF
     
   cpsf=serial_clean_beam(dpsf,imsize/50.)
