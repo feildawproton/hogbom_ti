@@ -107,17 +107,12 @@ def run_hogbom(dirty_img: np.ndarray, dirty_psf: np.ndarray, clean_psf: np.ndarr
         
         clean_scaled  = np.multiply(offset_clean_psf, beam_scale)
         clean_img     = np.add(clean_img, clean_scaled)
-        
-    
-    '''
-    plt.imshow(dirty_img_cpy[:,:,0])
-    #plt.scatter(x_max_np, y_max_np, s=20, c="red", marker='x')
-    plt.scatter(row_ndx, col_ndx, s=20, c="red", marker='x')
-    plt.savefig("steps/3p2_dirt_img_1_iter_real.png")
-    plt.imshow(dirty_img_cpy[:,:,1])
-    plt.savefig("steps/3p2_dirt_img_1_iter_imag.png")
-    ''' 
 
+    
+    plt.imshow(dirty_scaled[:,:,0])
+    plt.savefig("steps/3p2_scaled_dirt_psf_real.png")
+    plt.imshow(dirty_scaled[:,:,1])
+    plt.savefig("steps/3p2_scaled_dirt_psf_imag.png")
     
     plt.imshow(offset_dirty_psf[:,:,0])
     plt.savefig("steps/3p2_offset_dirt_psf_real.png")
@@ -152,16 +147,16 @@ def run_hogbom(dirty_img: np.ndarray, dirty_psf: np.ndarray, clean_psf: np.ndarr
 
 #psf is the same as beam
 def run_clean(dirty_psf: np.ndarray, dirty_img: np.ndarray): 
-    '''  
+    '''
     min_img_real = np.min(dirty_img[:,:,0])
     dirty_img[:,:,0] = np.subtract(dirty_img[:,:,0], min_img_real)
     max_img_real = np.max(dirty_img[:,:,0])
-    dirty_img[:,:,0] = np.add(dirty_img[:,:,0], max_img_real) 
+    dirty_img[:,:,0] = np.multiply(dirty_img[:,:,0], 1/max_img_real) 
     
     min_psf_real = np.min(dirty_psf[:,:,0])
     dirty_psf[:,:,0] = np.add(dirty_psf[:,:,0], min_psf_real)
     max_psf_real = np.max(dirty_psf[:,:,0])
-    dirty_psf[:,:,0] = np.add(dirty_img[:,:,0], max_psf_real) 
+    dirty_psf[:,:,0] = np.multiply(dirty_img[:,:,0], 1/max_psf_real) 
     
     print("dirty beam real max and min", np.max(dirty_psf[:,:,0]), np.min(dirty_psf[:,:,0]))
     print("dirty image real max and min", np.max(dirty_img[:,:,0]), np.min(dirty_img[:,:,0]))

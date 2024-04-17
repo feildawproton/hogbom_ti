@@ -810,14 +810,20 @@ if __name__ == '__main__':
   
   gpu_dpsf = gpu.to_gpu(dpsf)
   
-  dirty = np.roll(np.fliplr(gpu_im.get()),1,axis=1)
+  #dirty = np.roll(np.fliplr(gpu_im.get()),1,axis=1) # why
+  dirty = gpu_im.get()
   print("dirty image shape and type", dirty.shape, dirty.dtype)
-  print("max and min of dirty image", np.max(dirty), np.min(dirty))
+  print("max and min of dirty image", np.max(dirty), np.min(dirty), dirty.dtype)
   
   plt.imshow(dirty.real)
-  plt.savefig("steps/3p1_dirty_bm_real.png")
+  plt.savefig("output/dirty_img_real.png")
   plt.imshow(dirty.imag)
-  plt.savefig("steps/3p1_dirty_imag.png")
+  plt.savefig("output/dirty_img_imag.png")
+  
+  plt.imshow(dpsf.real)
+  plt.savefig("output/dirty_psf_real.png")
+  plt.imshow(dpsf.imag)
+  plt.savefig("output/dirty_psf_imag.png")
 
   ## Clean the PSF
     
