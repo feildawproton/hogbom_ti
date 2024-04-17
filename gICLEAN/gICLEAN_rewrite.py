@@ -60,7 +60,7 @@ __device__ __constant__ float cgf[32];
 // *********************
 
 __global__ void gridVis_wBM_kernel(float2 *Grd, float2 *bm, int *cnt, float *d_u, float *d_v, float *d_re, 
-	float *d_im, int nu, float du, int gcount, int umax, int vmax){
+	float *d_im, int nu, float du, int gcount, int umax, int vmax, int2 *dbg_ndc){
   int iu = blockDim.x*blockIdx.x + threadIdx.x;
   int iv = blockDim.y*blockIdx.y + threadIdx.y;
   int u0 = 0.5*nu;
@@ -79,7 +79,15 @@ __global__ void gridVis_wBM_kernel(float2 *Grd, float2 *bm, int *cnt, float *d_u
       int cnu=abs(iu-uu),cnv=abs(iv-vv);
       int ind = iv*nu+iu;
       if (cnu < HWIDTH && cnv < HWIDTH){
-        float wgt = cgf[int(round(4.6*cnu+NCGF-0.5))]*cgf[int(round(4.6*cnv+NCGF-0.5))];
+        //float wgt = cgf[int(round(4.6*cnu+NCGF-0.5))]*cgf[int(round(4.6*cnv+NCGF-0.5))];
+        int cnu_ndx = int(round(4.6*cnu+NCGF-0.5));
+        int cnv_ndx = int(round(4.6*cnv+NCGF-0.5));
+
+        dbg_ndc[ind].x += cnu_ndx;
+        dbg_ndc[ind].y += cnv_ndx;
+        
+        float wgt = cgf[cnu_ndx]*cgf[cnv_ndx];
+        
         Grd[ind].x +=       wgt*d_re[ivis];
         Grd[ind].y += hflag*wgt*d_im[ivis];
         cnt[ind]   += 1;
@@ -93,7 +101,14 @@ __global__ void gridVis_wBM_kernel(float2 *Grd, float2 *bm, int *cnt, float *d_u
         vv = mv/du+u0;
         cnu=abs(iu-uu),cnv=abs(iv-vv);
         if (cnu < HWIDTH && cnv < HWIDTH){
-          float wgt = cgf[int(round(4.6*cnu+NCGF-0.5))]*cgf[int(round(4.6*cnv+NCGF-0.5))];
+          //float wgt = cgf[int(round(4.6*cnu+NCGF-0.5))]*cgf[int(round(4.6*cnv+NCGF-0.5))];
+          int cnu_ndx = int(round(4.6*cnu+NCGF-0.5));
+          int cnv_ndx = int(round(4.6*cnv+NCGF-0.5));
+
+          dbg_ndc[ind].x += cnu_ndx;
+          dbg_ndc[ind].y += cnv_ndx;
+          
+          float wgt = cgf[cnu_ndx]*cgf[cnv_ndx];
           Grd[ind].x +=          wgt*d_re[ivis];
           Grd[ind].y += -1*hflag*wgt*d_im[ivis];
           cnt[ind]   += 1;
@@ -300,31 +315,23 @@ def spheroid(eta,m,alpha):
   etalim = np.float32([1., 1., 0.75, 0.775, 0.775])
   nnum   = np.int8([5, 7, 5, 5, 6])
   ndenom = np.int8([3, 2, 3, 3, 3]) 
-  p      = np.float32(
-           [   
-            [ [5.613913E-2,-3.019847E-1, 6.256387E-1,
-                -6.324887E-1, 3.303194E-1, 0.0, 0.0],
-                [6.843713E-2,-3.342119E-1, 6.302307E-1,
-                -5.829747E-1, 2.765700E-1, 0.0, 0.0],
-                [8.203343E-2,-3.644705E-1, 6.278660E-1,
-                -5.335581E-1, 2.312756E-1, 0.0, 0.0],
-                [9.675562E-2,-3.922489E-1, 6.197133E-1,
-                -4.857470E-1, 1.934013E-1, 0.0, 0.0],
-                [1.124069E-1,-4.172349E-1, 6.069622E-1,
-                -4.405326E-1, 1.618978E-1, 0.0, 0.0]
-            ],
-            [ [8.531865E-4,-1.616105E-2, 6.888533E-2,
-                -1.109391E-1, 7.747182E-2, 0.0, 0.0],
-                [2.060760E-3,-2.558954E-2, 8.595213E-2,
-                -1.170228E-1, 7.094106E-2, 0.0, 0.0],
-                [4.028559E-3,-3.697768E-2, 1.021332E-1,
-                -1.201436E-1, 6.412774E-2, 0.0, 0.0],
-                [6.887946E-3,-4.994202E-2, 1.168451E-1,
-                -1.207733E-1, 5.744210E-2, 0.0, 0.0],
-                [1.071895E-2,-6.404749E-2, 1.297386E-1,
-                -1.194208E-1, 5.112822E-2, 0.0, 0.0]
-             ] 
-            ])
+  p      = np.array([ 
+                    [ 
+                    [5.613913E-2,-3.019847E-1, 6.256387E-1,-6.324887E-1, 3.303194E-1, 0.0, 0.0],
+                    [6.843713E-2,-3.342119E-1, 6.302307E-1,-5.829747E-1, 2.765700E-1, 0.0, 0.0],
+                    [8.203343E-2,-3.644705E-1, 6.278660E-1,-5.335581E-1, 2.312756E-1, 0.0, 0.0],
+                    [9.675562E-2,-3.922489E-1, 6.197133E-1,-4.857470E-1, 1.934013E-1, 0.0, 0.0],
+                    [1.124069E-1,-4.172349E-1, 6.069622E-1,-4.405326E-1, 1.618978E-1, 0.0, 0.0]
+                    ],
+                    [ 
+                    [8.531865E-4,-1.616105E-2, 6.888533E-2,-1.109391E-1, 7.747182E-2, 0.0, 0.0],
+                    [2.060760E-3,-2.558954E-2, 8.595213E-2,-1.170228E-1, 7.094106E-2, 0.0, 0.0],
+                    [4.028559E-3,-3.697768E-2, 1.021332E-1,-1.201436E-1, 6.412774E-2, 0.0, 0.0],
+                    [6.887946E-3,-4.994202E-2, 1.168451E-1,-1.207733E-1, 5.744210E-2, 0.0, 0.0],
+                    [1.071895E-2,-6.404749E-2, 1.297386E-1,-1.194208E-1, 5.112822E-2, 0.0, 0.0]
+                    ] 
+                  ], dtype=np.float32)
+
   q = np.float32(
         [ 
           [ [1., 9.077644E-1, 2.535284E-1],
@@ -446,6 +453,8 @@ def cuda_gridvis(settings,plan):
   d_nbm  = gpu.zeros_like(d_grd)
   d_fim  = gpu.zeros((imsize,imsize),np.float32)
   
+  dbg_ndc = gpu.zeros((nx,nx,2), np.float32) 
+  
   print("d_cnt", d_cnt.shape)
   print("d_grd", d_grd.shape)
   print("d_bm", d_bm.shape)
@@ -467,9 +476,12 @@ def cuda_gridvis(settings,plan):
   h_cgf = gcf(ngcf,width)
   ## make grid correction
   h_corr = corrfun(nx,width)
+  
   d_cgf  = module.get_global('cgf')[0]
+  print("what is d_cgf", d_cgf)
   d_corr = gpu.to_gpu(h_corr) 
   cu.memcpy_htod(d_cgf,h_cgf)
+  print("what is h_cgf", h_cgf)
 
   # ------------------------
   # grid it up
@@ -492,22 +504,35 @@ def cuda_gridvis(settings,plan):
   #    - storing V(u,v) in texture memory?
   
   # 1.1)
-  gridVis_wBM_kernel(d_grd,d_bm,d_cnt,d_u,d_v,d_re,d_im,nx,du,gcount,umax,vmax,\
+  gridVis_wBM_kernel(d_grd,d_bm,d_cnt,d_u,d_v,d_re,d_im,nx,du,gcount,umax,vmax,dbg_ndc,\
 			block=blocksize2D,grid=gridsize2D)
-  '''
-  h_grd = d_grd.get()
-  h_bm  = d_bm.get()
   
-  plt.imshow(h_grd.real)
-  plt.savefig("half_grid_real.png")
-  plt.imshow(h_grd.imag)
-  plt.savefig("half_grid_imag.png")
-
-  plt.imshow(h_bm.real)
-  plt.savefig("half_bm_real.png")
-  plt.imshow(h_bm.imag)
-  plt.savefig("half_bm_imag.png")
-  '''
+  #h_grd = d_grd.get()
+  #h_bm  = d_bm.get()
+  
+  #plt.imshow(h_grd.real)
+  #plt.savefig("steps/1p1_half_grid_real.png")
+  #plt.imshow(h_grd.imag)
+  #plt.savefig("steps/1p1_half_grid_imag.png")
+  
+  
+  #plt.imshow(h_bm.real)
+  #plt.savefig("steps/1p1_half_bm_real.png")
+  #plt.imshow(h_bm.imag)
+  #plt.savefig("steps/1p1_half_bm_imag.png")
+  
+  
+  cnt = d_cnt.get()
+  plt.imshow(cnt)
+  plt.savefig("steps/1p1_half_cnt.png")
+  
+  ndc = dbg_ndc.get()
+  plt.imshow(ndc[:,:,0])
+  plt.savefig("steps/1p1_half_dbg_ndc_x.png")
+  plt.imshow(ndc[:,:,1])
+  plt.savefig("steps/1p1_half_dbg_ndc_y.png")
+  print(ndc)
+  
 
   # 1.2 ) 
   ## apply weights 
@@ -517,14 +542,14 @@ def cuda_gridvis(settings,plan):
   hfac = np.int32(1)
   dblGrid_kernel(d_bm,nx,hfac,block=blocksize2D,grid=gridsize2D)
 
-  '''
-  h_bm  = d_bm.get()
+  
+  #h_bm  = d_bm.get()
 
-  plt.imshow(h_bm.real)
-  plt.savefig("bm_real.png")
-  plt.imshow(h_bm.imag)
-  plt.savefig("bm_imag.png")
-  '''
+  #plt.imshow(h_bm.real)
+  #plt.savefig("steps/1p2_bm_real.png")
+  #plt.imshow(h_bm.imag)
+  #plt.savefig("steps/1p2_bm_imag.png")
+  
 
   # 1.4 )
   shiftGrid_kernel(d_bm,d_nbm,nx,block=blocksize2D,grid=gridsize2D)
@@ -532,9 +557,9 @@ def cuda_gridvis(settings,plan):
   h_bm  = d_nbm.get()
 
   plt.imshow(h_bm.real)
-  plt.savefig("shifted_bm_real.png")
+  plt.savefig("steps/1p4_shifted_bm_real.png")
   plt.imshow(h_bm.imag)
-  plt.savefig("shifted_bm_imag.png")
+  plt.savefig("steps/1p4_shifted_bm_imag.png")
   '''
   
   # 1.5) 
@@ -545,38 +570,64 @@ def cuda_gridvis(settings,plan):
   ## Reflect grid about v axis 
   hfac = np.int32(-1)
   dblGrid_kernel(d_grd,nx,hfac,block=blocksize2D,grid=gridsize2D)
-  '''
+  
   h_grd = d_grd.get()
   
   plt.imshow(h_grd.real)
-  plt.savefig("grid_real.png")
+  plt.savefig("steps/1p6_weighted_grid_real.png")
   plt.imshow(h_grd.imag)
-  plt.savefig("grid_imag.png")
-  '''
+  plt.savefig("steps/1p6_weights_grid_imag.png")
+  
   
   # 1.7 ) 
   ## Shift both
   shiftGrid_kernel(d_grd,d_ngrd,nx,block=blocksize2D,grid=gridsize2D)
   
-  '''
+  
   h_grd = d_ngrd.get()
   plt.imshow(h_grd.real)
-  plt.savefig("shifted_grid_real.png")
+  plt.savefig("steps/1p7_shifted_grid_real.png")
   plt.imshow(h_grd.imag)
-  plt.savefig("shifted_grid_imag.png")
-  '''
-
+  plt.savefig("steps/1p7_shifted_grid_imag.png")
+  
+  # 2.) make bean
   # ------------------------
   # Make the beam
   # ------------------------
   ## Transform to image plane 
+  # 2.1)  fft
   fft.fft(d_nbm,d_bm,plan) 
+  '''
+  print(type(plan))
+  h_bm  = d_bm.get()
+  plt.imshow(h_bm.real)
+  plt.savefig("steps/2p1_fft_bm_real.png")
+  plt.imshow(h_bm.imag)
+  plt.savefig("steps/2p1_fft_bm_imag.png")
+  
+  h_bm  = d_nbm.get()
+  plt.imshow(h_bm.real)
+  plt.savefig("steps/2p1_fft_nbm_real.png")
+  plt.imshow(h_bm.imag)
+  plt.savefig("steps/2p1_fft_nbm_imag.png")
+  '''
+ 
   ## Shift
+  # 2.2)
   shiftGrid_kernel(d_bm,d_nbm,nx,block=blocksize2D,grid=gridsize2D)
+
+  
+  # 2.3)
   ## Correct for C
+  print("h_corr:", h_corr)
   corrGrid_kernel(d_nbm,d_corr,nx,block=blocksize2D,grid=gridsize2D)
+
   # Trim
   trimIm_kernel(d_nbm,d_fim,noff,nx,imsize,block=blocksizeF2D,grid=gridsizeF2D)
+  
+  h_bm  = d_fim.get()
+ 
+  
   ## Normalize
   d_bmax = gpu.max(d_fim)
   bmax = d_bmax.get()
@@ -585,19 +636,34 @@ def cuda_gridvis(settings,plan):
   ## Pull onto CPU
   dpsf  = d_fim.get()
 
+
   # ------------------------
   # Make the map 
   # ------------------------
+  # 2.6)
   ## Transform to image plane 
   fft.fft(d_ngrd,d_grd,plan)
+
+  # 2.7)
   ## Shift
   shiftGrid_kernel(d_grd,d_ngrd,nx,block=blocksize2D,grid=gridsize2D)
+
+  
+  # 2.8)
   ## Correct for C
   corrGrid_kernel(d_ngrd,d_corr,nx,block=blocksize2D,grid=gridsize2D)
+  
+
+  
+  # 2.9)
   ## Trim
   trimIm_kernel(d_ngrd,d_fim,noff,nx,imsize,block=blocksizeF2D,grid=gridsizeF2D)
+
+  
+  # 2.10)
   ## Normalize (Jy/beam)
   nrmGrid_kernel(d_fim,bmax,imsize,block=blocksizeF2D,grid=gridsizeF2D)
+ 
 
   ## Finish timers
   t_end=time.time()
@@ -625,7 +691,9 @@ def serial_clean_beam(dpsf,window=20):
   cpsf[int(w/2-window):int(w/2+window),int(h/2-window):int(h/2+window)]=dpsf[int(w/2-window):int(w/2+window),int(h/2-window):int(h/2+window)]
   ##Normalize
   cpsf=cpsf/np.max(cpsf)  
+  print("dirty beam max and min", np.max(cpsf), np.min(cpsf))
   return np.float32(cpsf)
+
 
 def gpu_getmax(map):
   """
@@ -635,6 +703,10 @@ def gpu_getmax(map):
   imax=gpu.max(cumath.fabs(map)).get()
   if gpu.max(map).get()!=imax: imax*=-1
   return np.float32(imax)
+
+def gpu_getmin(map):
+  imin=gpu.min(cumath.fabs(map)).get()
+  return imin
 
 def cuda_hogbom(gpu_dirty,gpu_dpsf,gpu_cpsf,thresh=0.2,damp=1,gain=0.1,prefix='test'):
   """
@@ -673,8 +745,9 @@ def cuda_hogbom(gpu_dirty,gpu_dpsf,gpu_cpsf,thresh=0.2,damp=1,gain=0.1,prefix='t
 			block=blocksize, grid=gridsize)
     ## Step 2 - Subtract the beam (assume that it is normalized to have max 1)
     ##          This kernel simultaneously reconstructs the CLEANed image.  
+    dbg_min = gpu_getmin(gpu_dirty)
     print("Subtracting dirty beam "+str(i)+", maxval=%0.8f"%imax+' at x='+str(gpu_max_id.get()%width)+\
-      ', y='+str(gpu_max_id.get()/width))
+      ', y='+str(gpu_max_id.get()/width)+", curr min:", dbg_min)
     sub_beam_kernel(gpu_dirty,gpu_dpsf,gpu_max_id,gpu_clean,gpu_cpsf,np.float32(gain*imax),np.int32(width),\
 			np.int32(height), block=blocksize, grid=gridsize)
     i+=1
@@ -737,12 +810,21 @@ if __name__ == '__main__':
   
   gpu_dpsf = gpu.to_gpu(dpsf)
   
-  if CLEAN == True:
-    dirty = np.roll(np.fliplr(gpu_im.get()),1,axis=1)
+  dirty = np.roll(np.fliplr(gpu_im.get()),1,axis=1)
+  print("dirty image shape and type", dirty.shape, dirty.dtype)
+  print("max and min of dirty image", np.max(dirty), np.min(dirty))
+  
+  plt.imshow(dirty.real)
+  plt.savefig("steps/3p1_dirty_bm_real.png")
+  plt.imshow(dirty.imag)
+  plt.savefig("steps/3p1_dirty_imag.png")
 
-    ## Clean the PSF
+  ## Clean the PSF
     
-    cpsf=serial_clean_beam(dpsf,imsize/50.)
+  cpsf=serial_clean_beam(dpsf,imsize/50.)
+  
+  if CLEAN == True:
+
     gpu_cpsf = gpu.to_gpu(cpsf)
     
 
