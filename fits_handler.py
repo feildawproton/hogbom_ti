@@ -6,6 +6,7 @@ import math
 import taichi as ti
 #import scikits.cuda.fft as fft
 #import skcuda.fft as fft
+from matplotlib import pyplot as plt
 
 # -- PLEASE TREAT AS CONST --
 ARC_TO_RAD = math.pi / 180. / 3600.
@@ -164,6 +165,7 @@ def grid_BM_Vis_mirrored(du: float, u: ti.template(), v: ti.template(), real: ti
                     bm[x_ndx, y_ndx][0]   +=               kernelval_at_ndx
                     grid[x_ndx, y_ndx][0] +=               kernelval_at_ndx*real[vis_ndx]
                     grid[x_ndx, y_ndx][1] += hfac*-1*hflag*kernelval_at_ndx*imag[vis_ndx]
+                    cnt[x_ndx, y_ndx]     += 1
 
 #ti.template() passes by reference
 @ti.kernel
@@ -240,9 +242,9 @@ class FitsFile(object):
                 - gICLEAN by Katherine Rosenfeld and Nathan Sanders: http://nesanders.github.io/gICLEAN/ 
                 - Chapter 10 in "Interferometry and Synthesis in Radio Astronomy" by Thompson, Moran, & Swenson
                 - Daniel Brigg's PhD Thesis: http://www.aoc.nrao.edu/dissertations/dbriggs/ 
-            '''
-            ti.init()
+            ''' 
             
+            ti.init()
 
             nx          = 2*grid_dim_len
             du          = 1. / (ARC_TO_RAD * pix_arcsecs * nx)          
@@ -303,20 +305,52 @@ class FitsFile(object):
             
             # 1.) GRID
             # 1.1 and 1.3) bm and 1.6) grids
+            print("du", du)
+            print("max and min of u", np.max(u), np.min(u), "with shape", u.shape)
+            print("max and min of v", np.max(v), np.min(v), "with shape", v.shape)
+            print("max and min of real", np.max(real), np.min(real), "with shape", real.shape)
+            print("max and min of u", np.max(imag), np.min(imag), "with shape", imag.shape)
+            print("max and min of u", np.max(cgf_np), np.min(cgf_np), "with shape", cgf_np.shape)
             grid_BM_Vis_mirrored(du=du, u=u_ti, v=v_ti, real=real_ti, imag=imag_ti, cgf=cgf_ti, 
                                     bm=bm_ti, grid=grid_ti, cnt=cnts_ti)
+            
+            bm_np  = bm_ti.to_numpy()
+            bm_np  = np.add(bm_np[:,:,0], np.multiply(bm_np[:,:,1], 1j)) 
+            
+            plt.imshow(bm_np.real)
+            plt.savefig("steps/1p1_bm_real.png")
+            plt.imshow(bm_np.imag)
+            plt.savefig("steps/1p1_bm_imag.png")
+            
+            print("max and min of real shifted beam", np.max(bm_np.real), np.min(bm_np.real))
+            print("max and min of imag shifted beam", np.max(bm_np.imag), np.min(bm_np.imag))
+            
+            counts = cnts_ti.to_numpy()
+            print("max and min of counts", np.max(counts), np.average(counts), np.min(counts), "with shape", counts.shape, "half avg", np.average(counts)/2, 
+                  "sum", np.sum(counts), np.sum(counts)/2, "type", counts.dtype)
             
             # 1.2) apply weights to bm
             apply_weights(count=cnts_ti, briggs_wght=briggs_weight, grid=bm_ti)
             
             # 1.4) shift bm
             shift(grid=bm_ti, out_grid=shifted_bm_ti)
+            shifted_bm_np  = shifted_bm_ti.to_numpy()
+            shifted_bm_np  = np.add(shifted_bm_np[:,:,0], np.multiply(shifted_bm_np[:,:,1], 1j)) 
+            
+            plt.imshow(shifted_bm_np.real)
+            plt.savefig("steps/1p4_shifted_bm_real.png")
+            plt.imshow(shifted_bm_np.imag)
+            plt.savefig("steps/1p4_shifted_bm_imag.png")
+            
+            print("max and min of real shifted beam", np.max(shifted_bm_np.real), np.min(shifted_bm_np.real))
+            print("max and min of imag shifted beam", np.max(shifted_bm_np.imag), np.min(shifted_bm_np.imag))
             
             # 1.5) weight vis grid
             apply_weights(count=cnts_ti, briggs_wght=briggs_weight, grid=grid_ti)
             
             # 1.7 ) shift grid
             shift(grid_ti, shifted_grid_ti)
+
             
             # replacing
             # plan = fft.Plan((self.nx,self.nx),np.complex64,np.complex64) 
@@ -327,8 +361,8 @@ class FitsFile(object):
             # https://medium.com/codex/pycuda-the-fft-and-the-gerchberg-saxton-algorithm-35fb7bceb62f
             
             # 2.1)
-            shifted_bm_np  = shifted_bm_ti.to_numpy()
-            shifted_bm_np  = np.add(shifted_bm_np[:,:,0], np.multiply(shifted_bm_np[:,:,1], 1j)) 
+
+            
             fft_shifted_bm = np.fft.fft2(shifted_bm_np, s=shifted_bm_np.shape)
     
             print(fft_shifted_bm.shape, type(fft_shifted_bm), fft_shifted_bm.dtype)
@@ -396,7 +430,7 @@ class FitsFile(object):
             return dirty_psf, dirty_img
             
 if __name__ == "__main__":
-    from matplotlib import pyplot as plt
+
     
     fits_file = FitsFile(path="demo_data/sim1.mickey.alma.out20.ms.fits", use_ti=True)
     grid_dim_len = 64 # characteristic size of the image, size will be grid_dim_len*grid_dim_len

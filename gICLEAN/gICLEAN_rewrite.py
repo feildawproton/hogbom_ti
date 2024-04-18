@@ -490,10 +490,6 @@ def cuda_gridvis(settings,plan):
   d_vmax = gpu.max(cumath.fabs(d_v))
   umax   = np.int32(np.ceil(d_umax.get()/du))
   vmax   = np.int32(np.ceil(d_vmax.get()/du))
-  
-  print("du", du)
-  print("umax", umax)
-  print("vmax", vmax)
 
   ## grid ($$)
   #  This should be improvable via:
@@ -504,22 +500,35 @@ def cuda_gridvis(settings,plan):
   #    - storing V(u,v) in texture memory?
   
   # 1.1)
+  print("du", du)
+  print("max and min of u", np.max(h_u), np.min(h_u), "with shape", h_u.shape)
+  print("max and min of v", np.max(h_v), np.min(h_v), "with shape", h_v.shape)
+  print("max and min of real", np.max(h_re), np.min(h_re), "with shape", h_re.shape)
+  print("max and min of u", np.max(h_im), np.min(h_im), "with shape", h_im.shape)
+  print("max and min of u", np.max(h_cgf), np.min(h_cgf), "with shape", h_cgf.shape)
   gridVis_wBM_kernel(d_grd,d_bm,d_cnt,d_u,d_v,d_re,d_im,nx,du,gcount,umax,vmax,dbg_ndc,\
 			block=blocksize2D,grid=gridsize2D)
   
   #h_grd = d_grd.get()
-  #h_bm  = d_bm.get()
+  h_bm  = d_bm.get()
+  '''
+  plt.imshow(h_grd.real)
+  plt.savefig("steps/1p1_half_grid_real.png")
+  plt.imshow(h_grd.imag)
+  plt.savefig("steps/1p1_half_grid_imag.png")
+  '''
   
-  #plt.imshow(h_grd.real)
-  #plt.savefig("steps/1p1_half_grid_real.png")
-  #plt.imshow(h_grd.imag)
-  #plt.savefig("steps/1p1_half_grid_imag.png")
+  plt.imshow(h_bm.real)
+  plt.savefig("steps/1p1_half_bm_real.png")
+  plt.imshow(h_bm.imag)
+  plt.savefig("steps/1p1_half_bm_imag.png")
   
+  print("max and min of real unweighted beam", np.max(h_bm.real), np.min(h_bm.real))
+  print("max and min of imag unweighted beam", np.max(h_bm.imag), np.min(h_bm.imag))
   
-  #plt.imshow(h_bm.real)
-  #plt.savefig("steps/1p1_half_bm_real.png")
-  #plt.imshow(h_bm.imag)
-  #plt.savefig("steps/1p1_half_bm_imag.png")
+  counts = d_cnt.get()
+  print("max and min of counts", np.max(counts), np.average(counts), np.min(counts), "with shape", counts.shape, 
+      "sum", np.sum(counts), "type", counts.dtype)
   
   
   cnt = d_cnt.get()
@@ -531,7 +540,7 @@ def cuda_gridvis(settings,plan):
   plt.savefig("steps/1p1_half_dbg_ndc_x.png")
   plt.imshow(ndc[:,:,1])
   plt.savefig("steps/1p1_half_dbg_ndc_y.png")
-  print(ndc)
+  #print(ndc)
   
 
   # 1.2 ) 
@@ -543,24 +552,22 @@ def cuda_gridvis(settings,plan):
   dblGrid_kernel(d_bm,nx,hfac,block=blocksize2D,grid=gridsize2D)
 
   
-  #h_bm  = d_bm.get()
 
-  #plt.imshow(h_bm.real)
-  #plt.savefig("steps/1p2_bm_real.png")
-  #plt.imshow(h_bm.imag)
-  #plt.savefig("steps/1p2_bm_imag.png")
   
 
   # 1.4 )
   shiftGrid_kernel(d_bm,d_nbm,nx,block=blocksize2D,grid=gridsize2D)
-  '''
+  
   h_bm  = d_nbm.get()
 
   plt.imshow(h_bm.real)
   plt.savefig("steps/1p4_shifted_bm_real.png")
   plt.imshow(h_bm.imag)
   plt.savefig("steps/1p4_shifted_bm_imag.png")
-  '''
+  
+  print("max and min of real shifted beam", np.max(h_bm.real), np.min(h_bm.real))
+  print("max and min of imag shifted beam", np.max(h_bm.imag), np.min(h_bm.imag))
+  
   
   # 1.5) 
   ## normalize
@@ -583,12 +590,13 @@ def cuda_gridvis(settings,plan):
   ## Shift both
   shiftGrid_kernel(d_grd,d_ngrd,nx,block=blocksize2D,grid=gridsize2D)
   
-  
+  '''
   h_grd = d_ngrd.get()
   plt.imshow(h_grd.real)
   plt.savefig("steps/1p7_shifted_grid_real.png")
   plt.imshow(h_grd.imag)
   plt.savefig("steps/1p7_shifted_grid_imag.png")
+  '''
   
   # 2.) make bean
   # ------------------------
@@ -619,13 +627,12 @@ def cuda_gridvis(settings,plan):
   
   # 2.3)
   ## Correct for C
-  print("h_corr:", h_corr)
   corrGrid_kernel(d_nbm,d_corr,nx,block=blocksize2D,grid=gridsize2D)
 
   # Trim
   trimIm_kernel(d_nbm,d_fim,noff,nx,imsize,block=blocksizeF2D,grid=gridsizeF2D)
   
-  h_bm  = d_fim.get()
+  #h_bm  = d_fim.get()
  
   
   ## Normalize
@@ -765,7 +772,7 @@ if __name__ == '__main__':
   
     
   example = 'mouse'
-  ISIZE = 64
+  ISIZE = 128
   CLEAN = True
   
   # Load settings for each example

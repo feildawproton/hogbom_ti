@@ -1,10 +1,10 @@
 # -- GLOBAL IMPORTS --
 import numpy as np
 from typing import Tuple
-import taichi as ti
+#import taichi as ti
 
 
-def clean_beam_by_window(dirty_psf: np.ndarray, window=20):
+def clean_beam_by_window_real(dirty_psf: np.ndarray, window=20):
     # a better solution would be to fit a gaussian according the gICLEAN
     # they suggest this: http://code.google.com/p/agpy/source/browse/trunk/agpy/gaussfitter.py
     
@@ -14,28 +14,27 @@ def clean_beam_by_window(dirty_psf: np.ndarray, window=20):
     
     width   = dirty_psf.shape[0]
     height  = dirty_psf.shape[1]
-    '''
+
     x_start = int(width/2 - window) - 1 # in case to small
     x_stop  = int(width/2 + window) + 3  # come back to this
     y_start = int(height/2 - window) - 1
     y_stop  = int(height/2 + window) + 3
     print(x_start, x_stop, y_start, y_stop)
-    clean_beam[x_start:x_stop,y_start:y_stop,:] = dirty_psf[x_start:x_stop,y_start:y_stop,:]
+    clean_beam[x_start:x_stop,y_start:y_stop] = dirty_psf[x_start:x_stop,y_start:y_stop]
     
     #clean_beam[width/2, height/2] 
     
     #max_cmplx  = np.max(clean_beam, axis=(0,1))
-    max_real = np.max(clean_beam[:,:,0])
-    clean_beam[:,:,0] = np.multiply(clean_beam[:,:,0], 1/max_real)
-    '''
-    
-    clean_beam[int(width/2),int(height/2),0] = 1.0
+    max_real = np.max(clean_beam)
+    clean_beam = np.multiply(clean_beam, 1/max_real)
+
+    #clean_beam[int(width/2),int(height/2),0] = 1.0
     
     return clean_beam
 
 
-def run_hogbom(dirty_img: np.ndarray, dirty_psf: np.ndarray, clean_psf: np.ndarray, thresh=0.2, damp=1., gain=0.1
-              ) -> Tuple[np.ndarray, np.ndarray]:
+def run_hogbom_real(dirty_img: np.ndarray, dirty_psf: np.ndarray, clean_psf: np.ndarray, thresh=0.2, damp=1., gain=0.1
+                   ) -> Tuple[np.ndarray, np.ndarray]:
     # http://www.cv.nrao.edu/~abridle/deconvol/node8.html
     # parameters
     # dirty image
@@ -43,14 +42,16 @@ def run_hogbom(dirty_img: np.ndarray, dirty_psf: np.ndarray, clean_psf: np.ndarr
     # fraction of max pixel intensity threshold
     # damping factor to scale dirty beam
 
-    dirty_img_cpy = np.copy(dirty_img)
-    clean_img     = np.zeros(shape=dirty_img_cpy.shape, dtype=np.float32)
+    drty_remain = np.copy(dirty_img)
+    clean_img   = np.zeros(shape=drty_remain.shape, dtype=np.float32)
     
     max_col_ndc = []
     max_row_ndc = []
     
-    for iter in range(10):
-        abs_real = np.abs(dirty_img_cpy[:,:,0])
+    iters = 2760
+    
+    for iter in range(iters):
+        abs_real = np.abs(drty_remain)
         max_ndx  = np.argmax(abs_real)
         col_ndx  = int(max_ndx/abs_real.shape[0])
         row_ndx  = int(max_ndx % abs_real.shape[0])
@@ -95,13 +96,13 @@ def run_hogbom(dirty_img: np.ndarray, dirty_psf: np.ndarray, clean_psf: np.ndarr
         offset_clean_psf = np.zeros(shape=clean_psf.shape)
         offset_clean_psf[view_x_start:view_x_stop,view_y_start:view_y_stop] = clean_psf[srce_x_start:srce_x_stop,srce_y_start:srce_y_stop]
         
-        max_real      = dirty_img_cpy[x_max_ndx, y_max_ndx, 0]
+        max_real      = drty_remain[x_max_ndx, y_max_ndx]
         beam_scale    = max_real*gain
         print("max abs real", abs_real[x_max_ndx, y_max_ndx], "and real val there", max_real)
         print("found at", x_max_ndx, y_max_ndx, "with scale", beam_scale)
-        print("current min real:", np.min(dirty_img_cpy[:,:,0]))
+        print("current min real:", np.min(drty_remain))
         dirty_scaled  = np.multiply(offset_dirty_psf, beam_scale)
-        dirty_img_cpy = np.subtract(dirty_img_cpy, dirty_scaled)
+        drty_remain = np.subtract(drty_remain, dirty_scaled)
         
         #print("shape of dirty img copy", dirty_img_cpy.shape)
         
@@ -109,44 +110,21 @@ def run_hogbom(dirty_img: np.ndarray, dirty_psf: np.ndarray, clean_psf: np.ndarr
         clean_img     = np.add(clean_img, clean_scaled)
 
     
-    plt.imshow(dirty_scaled[:,:,0])
-    plt.savefig("steps/3p2_scaled_dirt_psf_real.png")
-    plt.imshow(dirty_scaled[:,:,1])
-    plt.savefig("steps/3p2_scaled_dirt_psf_imag.png")
+    plt.imshow(dirty_scaled)
+    plt.savefig("steps/3p2_scaled_dirt_psf_real_" + str(iters)+"iters.png")
     
-    plt.imshow(offset_dirty_psf[:,:,0])
-    plt.savefig("steps/3p2_offset_dirt_psf_real.png")
-    plt.imshow(offset_dirty_psf[:,:,1])
-    plt.savefig("steps/3p2_offset_dirt_psf_imag.png")
+    plt.imshow(clean_scaled)
+    plt.savefig("steps/3p2_scaled_clean_psf_real_" + str(iters)+"iters.png")
     
-    plt.imshow(offset_clean_psf[:,:,0])
-    plt.savefig("steps/3p2_offset_clean_psf_real.png")
-    plt.imshow(offset_clean_psf[:,:,1])
-    plt.savefig("steps/3p2_offset_clean_psf_imag.png")
+    plt.imshow(clean_img)
+    plt.savefig("steps/3p2_clean_img_real_" + str(iters)+"iters.png")
     
-    plt.imshow(dirty_img_cpy[:,:,0])
-    #plt.scatter(row_ndx, col_ndx, s=20, c="red", marker='x')
-    plt.savefig("steps/3p2_dirt_img_1_iter_real.png")
-    plt.imshow(dirty_img_cpy[:,:,1])
-    plt.savefig("steps/3p2_dirt_img_1_iter_imag.png")
-    
-    plt.imshow(clean_img[:,:,0])
-    #plt.scatter(x_max_np, y_max_np, s=20, c="red", marker='x')
-    #plt.scatter(row_ndx, col_ndx, s=20, c="red", marker='x')
-    plt.savefig("steps/3p2_clean_img_1_iter_real.png")
-    plt.imshow(clean_img[:,:,1])
-    plt.savefig("steps/3p2_clean_img_1_iter_imag.png")
-    
-    print("test indexing")
-    dirty_img[col_ndx, row_ndx, :] = 1
-    plt.imshow(dirty_img_cpy[:,:,0])
+    plt.imshow(drty_remain)
     plt.scatter(max_row_ndc, max_col_ndc, s=20, c="red", marker='x')
-    plt.savefig("steps/3p2_dirt_img_test_indexing_real.png")
-    plt.imshow(dirty_img_cpy[:,:,1])
-    plt.savefig("steps/3p2_dirt_img_test_indexing_imag.png")
+    plt.savefig("steps/3p2_drty_remain_real_" + str(iters)+"iters.png")
 
 #psf is the same as beam
-def run_clean(dirty_psf: np.ndarray, dirty_img: np.ndarray): 
+def run_clean_real(dirty_psf: np.ndarray, dirty_img: np.ndarray): 
     '''
     min_img_real = np.min(dirty_img[:,:,0])
     dirty_img[:,:,0] = np.subtract(dirty_img[:,:,0], min_img_real)
@@ -163,14 +141,12 @@ def run_clean(dirty_psf: np.ndarray, dirty_img: np.ndarray):
     '''
     
     # 1.) -- CLEAN THE PSF --
-    clean_psf = clean_beam_by_window(dirty_psf=dirty_psf, window=dirty_img.shape[0]/50)
+    clean_psf = clean_beam_by_window_real(dirty_psf=dirty_psf, window=dirty_img.shape[0]/50)
     
-    plt.imshow(clean_psf[:,:,0])
+    plt.imshow(clean_psf)
     plt.savefig("output/clean_psf_real.png")
-    plt.imshow(clean_psf[:,:,1])
-    plt.savefig("output/clean_psf_imag.png")
     
-    run_hogbom(dirty_img=dirty_img, dirty_psf=dirty_psf, clean_psf=clean_psf)
+    run_hogbom_real(dirty_img=dirty_img, dirty_psf=dirty_psf, clean_psf=clean_psf)
     
 if __name__ == "__main__":
     # -- GLOBAL FOR TESTING --
@@ -179,12 +155,12 @@ if __name__ == "__main__":
     # -- LOCAL FOR TESTING
     from fits_handler import FitsFile    
     
+    '''
     fits_file = FitsFile(path="demo_data/sim1.mickey.alma.out20.ms.fits", use_ti=True)
     grid_dim_len  = 64 # characteristic size of the image, size will be grid_dim_len*grid_dim_len
     pix_arcsecs   = 5.12 / grid_dim_len
     briggs_weight = 1e3
     dirty_psf, dirty_img = fits_file.convert_to_grid(grid_dim_len=grid_dim_len, pix_arcsecs=pix_arcsecs, briggs_weight=briggs_weight)
-    
     print("dirty beam real max and min", np.max(dirty_psf[:,:,0]), np.min(dirty_psf[:,:,0]))
     print("dirty image real max and min", np.max(dirty_img[:,:,0]), np.min(dirty_img[:,:,0]))
     
@@ -197,9 +173,19 @@ if __name__ == "__main__":
     plt.savefig("output/dirty_img_real.png")
     plt.imshow(dirty_img[:,:,1])
     plt.savefig("output/dirty_img_imag.png")
+    '''
+    
+    dirty_psf = np.load("./gICLEAN/output/dirty_psf_real_128.npy")
+    dirty_img = np.load("./gICLEAN/output/dirty_img_real_128.npy")
+    
+    plt.imshow(dirty_psf)
+    plt.savefig("output/dirty_psf_real.png")
+    plt.imshow(dirty_img)
+    plt.savefig("output/dirty_img_real.png")
+
     
     
-    run_clean(dirty_psf=dirty_psf, dirty_img=dirty_img)
+    run_clean_real(dirty_psf=dirty_psf, dirty_img=dirty_img)
     
 
     
